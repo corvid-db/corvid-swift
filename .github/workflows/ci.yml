@@ -70,4 +70,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Resolve docs/SURFACE.tsv against the pinned engine surface
-        run: ./scripts/surface-gate.sh
+        # bash-invoked (not ./): immune to exec-bit drift between
+        # macOS checkouts and the index.
+        run: bash ./scripts/surface-gate.sh
