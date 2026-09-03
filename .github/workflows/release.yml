@@ -1,0 +1,70 @@
+# release — tag-driven publish (the SPM tag IS the release).
+#
+# Consumers resolve `.package(url: "https://github.com/corvid-db/corvid-swift.git",
+# from: "X.Y.Z")`; this workflow's job is to make a tag TRUSTWORTHY: the
+# gate verifies tag == .engine-pin == the Package.swift binary-target
+# URL's version, and that the manifest's checksum literal matches BOTH
+# the sha256 of the actual zip at that URL AND the engine release's
+# checksums.txt entry (a drifted checksum would break every consumer's
+# resolve). On green it creates the GitHub release with notes — the
+# binary itself lives on the ENGINE's release; nothing is uploaded here.
+#
+# The release cascade (engine repo scripts/bindings/bump.sh) maintains
+# all three pins + the checksum together in each bump PR.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the release
+
+jobs:
+  release:
+    name: gate + release
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate — tag == pin == manifest URL, checksum verified
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          fail() { echo "::error::$1" >&2; exit 1; }
+
+          PIN="$(tr -d '[:space:]' < .engine-pin)"
+          [ "$TAG" = "$PIN" ] || fail "tag $TAG does not match .engine-pin ($PIN)."
+
+          URL_PIN="$(grep -oE 'releases/download/v[0-9]+\.[0-9]+\.[0-9]+/corvid-swift-v[0-9]+\.[0-9]+\.[0-9]+\.zip' Package.swift | head -1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          [ -n "$URL_PIN" ] || fail "cannot read the engine tag from Package.swift's binary-target URL."
+          [ "$TAG" = "$URL_PIN" ] || fail "tag $TAG does not match Package.swift's binary-target URL version ($URL_PIN)."
+
+          MANIFEST_SUM="$(grep -oE 'checksum: "[0-9a-f]{64}"' Package.swift | head -1 | grep -oE '[0-9a-f]{64}')"
+          [ -n "$MANIFEST_SUM" ] || fail "cannot read the checksum literal from Package.swift."
+          ZIP_URL="$(grep -oE 'https://github\.com/[^"]+\.zip' Package.swift | head -1)"
+
+          TMP="$(mktemp -d)"
+          curl -fsSL -o "$TMP/zip" "$ZIP_URL"
+          ACTUAL_SUM="$(shasum -a 256 "$TMP/zip" | awk '{print $1}')"
+          [ "$ACTUAL_SUM" = "$MANIFEST_SUM" ] || fail "Package.swift checksum $MANIFEST_SUM != the zip's actual sha256 $ACTUAL_SUM."
+
+          curl -fsSL -o "$TMP/checksums.txt" "https://github.com/corvid-db/corvid/releases/download/$TAG/checksums.txt"
+          RELEASE_SUM="$(awk -v f="corvid-swift-$TAG.zip" '$2 == f { print $1 }' "$TMP/checksums.txt")"
+          [ -n "$RELEASE_SUM" ] || fail "corvid-swift-$TAG.zip is not listed in the engine release's checksums.txt."
+          [ "$RELEASE_SUM" = "$ACTUAL_SUM" ] || fail "the engine release's checksum ($RELEASE_SUM) != the zip's actual sha256 ($ACTUAL_SUM)."
+          rm -rf "$TMP"
+          echo "gate OK: tag $TAG == pin == manifest URL; checksum verified against both the manifest and the engine release."
+
+      - name: Swift test (the golden suite, against the pinned xcframework)
+        run: swift test
+
+      - name: Create the release (idempotent)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" \
+            || gh release create "$GITHUB_REF_NAME" \
+                 --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
