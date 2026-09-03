@@ -40,5 +40,40 @@ let package = Package(
             dependencies: ["Corvid"],
             path: "Tests/CorvidTests"
         ),
+        // The six-example tour (the org-wide invariant: quickstart,
+        // hybrid, vector-index families, text search incl. CJK, graph,
+        // geo) — one executable target each, run by CI. The docs site
+        // splices the docs:begin/end-marked region of each file into
+        // the binding page (corvid-docs sync-binding-examples).
+        .executableTarget(
+            name: "Quickstart",
+            dependencies: ["Corvid"],
+            path: "Examples/Quickstart"
+        ),
+        .executableTarget(
+            name: "Hybrid",
+            dependencies: ["Corvid"],
+            path: "Examples/Hybrid"
+        ),
+        .executableTarget(
+            name: "VectorIndex",
+            dependencies: ["Corvid"],
+            path: "Examples/VectorIndex"
+        ),
+        .executableTarget(
+            name: "TextSearch",
+            dependencies: ["Corvid"],
+            path: "Examples/TextSearch"
+        ),
+        .executableTarget(
+            name: "Graph",
+            dependencies: ["Corvid"],
+            path: "Examples/Graph"
+        ),
+        .executableTarget(
+            name: "Geo",
+            dependencies: ["Corvid"],
+            path: "Examples/Geo"
+        ),
     ]
 )

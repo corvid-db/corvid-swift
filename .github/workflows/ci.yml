@@ -42,6 +42,23 @@ jobs:
           DEST='generic/platform=iOS Simulator'
           xcodebuild -scheme Corvid -destination "$DEST" build 2>&1 | tail -5
 
+  examples:
+    # The six-example tour (the org-wide invariant), run against the
+    # pinned xcframework — deterministic corpora, deterministic output.
+    name: examples tour (six runnable programs)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the tour
+        run: |
+          set -euo pipefail
+          for e in Quickstart Hybrid VectorIndex TextSearch Graph Geo; do
+            echo "::group::swift run $e"
+            swift run "$e"
+            echo "::endgroup::"
+          done
+
   surface-gate:
     # docs/SURFACE.tsv vs the engine's surface list at the PINNED tag:
     # every engine construct mapped (binding api + proving test) or N/A
