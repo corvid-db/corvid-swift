@@ -55,7 +55,7 @@ try docs.insert(
     Data("s1".utf8),
     ["kind": "doc",
      "body": "rust embedded database",
-     "v": [1.0, 0.0]] as [String: Any?])
+     "v": [1.0, 0.0] as [Float]] as [String: Any?])
 
 let rows = Array(try docs.query()
     .filter(try field("kind").eq("doc"))
@@ -74,7 +74,10 @@ whose leaves are `Bool`, `Int`, `UInt` (by bit pattern), `Double`,
 `Float`, `String`, `Data`, and `[Float]` vectors; decoding yields the
 canonical shapes (`nil`/`Bool`/`Int`/`Double`/`String`/`Data`/
 `[Float]`/`[Any?]`/`[String: Any?]`), NaNs bit-exact. Keys are
-`Data`. Errors are `throws` + `CorvidError` (the frozen code table +
+`Data`. **Vectors are `[Float]`** — inside a document literal, write
+`"v": [1.0, 0.0] as [Float]`; a bare `[1.0, 0.0]` infers `[Double]`
+and encodes as an *array* of two floats, which is correct but is not
+a vector. Errors are `throws` + `CorvidError` (the frozen code table +
 the engine's message, read in the same call that failed). Throwing
 closures passed to `update`/`scan` abort the engine call and rethrow
 at the call site.
